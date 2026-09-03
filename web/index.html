@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heat Warning Agent</title>
+<meta name="description" content="A voice agent that phones outdoor workers when heat crosses a dangerous limit, and confirms they understood.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground:#FBF9F5; --surface:#FFF; --alt:#F2EEE6;
+    --ink:#1C1A17; --soft:#4A453D; --muted:#7A7368; --rule:#DFD8CB;
+    --amber:#C25708; --amber-soft:#F5E4D2; --shade:#2E3A34; --alert:#A82D22;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#131110; --surface:#1B1917; --alt:#232019;
+      --ink:#F2EEE6; --soft:#C6BFB3; --muted:#8E8678; --rule:#35302A;
+      --amber:#F0862B; --amber-soft:#3A2513; --shade:#9CB4A6; --alert:#E86C5C;
+    }
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);
+    font-family:"Barlow","Helvetica Neue",Arial,sans-serif;font-size:17px;line-height:1.6;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px 80px}
+  header{padding:64px 0 24px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--amber);margin:0 0 12px}
+  h1{font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif;font-weight:700;
+    font-size:clamp(40px,7vw,68px);line-height:1;margin:0;letter-spacing:-.015em}
+  .lead{font-size:19px;color:var(--soft);max-width:56ch;margin:18px 0 0}
+  .threshold{height:3px;border:0;margin:22px 0 0;
+    background:linear-gradient(to right,var(--amber) 0 38%,var(--rule) 38% 100%)}
+  h2{font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;
+    font-size:clamp(24px,3.6vw,32px);margin:0 0 6px;line-height:1.1}
+  section{padding:40px 0;border-bottom:1px solid var(--rule)}
+  section:last-of-type{border-bottom:0}
+  p{margin:0 0 14px;max-width:64ch}
+  .fine{font-size:15px;color:var(--muted);max-width:64ch}
+  button{font:inherit;font-weight:600;cursor:pointer;border-radius:3px;border:1px solid var(--rule);
+    background:var(--surface);color:var(--ink);padding:11px 20px}
+  button.primary{background:var(--amber);border-color:var(--amber);color:#fff}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0}
+  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:20px 22px}
+  .status{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--muted)}
+  #log{font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.7;
+    max-height:260px;overflow-y:auto;margin-top:14px}
+  #log div{padding:3px 0;border-bottom:1px solid var(--rule)}
+  #log .agent{color:var(--amber)}
+  #log .worker{color:var(--ink);font-weight:500}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:18px}
+  .fact{border:1px solid var(--rule);border-left:3px solid var(--rule);border-radius:3px;
+    padding:14px 16px;background:var(--surface)}
+  .fact h3{font-family:"Barlow Condensed",Arial,sans-serif;font-size:17px;margin:0 0 4px;font-weight:600}
+  .fact .v{font-family:"IBM Plex Mono",monospace;font-size:12px;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--muted)}
+  .fact.yes{border-left-color:var(--shade)} .fact.yes .v{color:var(--shade)}
+  .fact.no{border-left-color:var(--alert)} .fact.no .v{color:var(--alert)}
+  .fact .ev{font-size:14px;color:var(--soft);margin-top:8px;font-style:italic}
+  .note{background:var(--amber-soft);color:var(--amber);border-radius:3px;padding:12px 16px;
+    font-size:15px;margin:16px 0}
+  ul.plain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
+  ul.plain li{padding-left:20px;position:relative;max-width:64ch}
+  ul.plain li::before{content:"";position:absolute;left:0;top:11px;width:9px;height:2px;background:var(--amber)}
+  a{color:var(--amber)}
+  code{font-family:"IBM Plex Mono",monospace;font-size:.92em;background:var(--alt);padding:1px 5px;border-radius:2px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">AssemblyAI Voice Agent Hackathon</p>
+  <h1>Heat Warning Agent</h1>
+  <hr class="threshold">
+  <p class="lead">It phones outdoor workers when heat crosses a dangerous limit, and confirms they understood. Not that they answered. That they understood.</p>
+</header>
+
+<section>
+  <h2>A worker who says &ldquo;haan&rdquo; has not understood anything</h2>
+  <p>Karachi&rsquo;s 2015 heatwave killed over a thousand people in a week, most of them working outdoors. The forecasts existed. They never arrived.</p>
+  <p>The obvious fix is to phone people. The non-obvious problem is that reflexive agreement to an authoritative voice on a phone is the <em>default</em> behaviour. A naive flow records that yes as a successful warning, and the employer ends up holding a compliance record full of agreement that meant nothing, which is worse than holding no record at all.</p>
+  <p><strong>So this agent never asks a question that &ldquo;yes&rdquo; can answer.</strong> It asks what you are going to do, and where you are going to sit.</p>
+</section>
+
+<section>
+  <h2>Try it</h2>
+  <p class="fine">Your browser microphone, streaming to AssemblyAI&rsquo;s Voice Agent API. Answer as a worker would. Try agreeing without understanding and watch what gets recorded.</p>
+
+  <div class="row">
+    <button id="start" class="primary">Start the call</button>
+    <button id="stop" disabled>End call</button>
+    <button id="walk">Play a scripted call instead</button>
+  </div>
+  <div class="status" id="status">idle</div>
+
+  <div class="panel" style="margin-top:18px">
+    <div class="status">TRANSCRIPT</div>
+    <div id="log"><div class="fine" style="border:0">Nothing yet.</div></div>
+  </div>
+
+  <div class="facts" id="facts"></div>
+  <div id="verdict"></div>
+</section>
+
+<section>
+  <h2>What it records</h2>
+  <ul class="plain">
+    <li><strong>Understood the warning.</strong> Only true if they said something showing comprehension. Their own words are kept as evidence beside the judgement, so a reviewer can check the call rather than trust it.</li>
+    <li><strong>Stopped work.</strong> And if they cannot, <em>why</em>. &ldquo;I&rsquo;m paid per delivery&rdquo; is the most useful thing a call can learn, and no thermometer can tell you it.</li>
+    <li><strong>Has water and shade.</strong></li>
+    <li><strong>Distress interrupt.</strong> Dizziness, nausea, confusion or having stopped sweating abandons the script immediately and escalates to a human.</li>
+  </ul>
+  <p class="fine" style="margin-top:16px">Every fact starts <code>null</code>, meaning not established, which is a different state from false. A call that drops before the water question must never record that the worker had no water.</p>
+</section>
+
+<section>
+  <h2>Urdu, honestly</h2>
+  <p>AssemblyAI streams 18 languages with native code-switching. Urdu is not among them. Hindi is.</p>
+  <p>Spoken Urdu and spoken Hindi are the same language. They diverge in script and in formal register, not in <em>&ldquo;I stopped, I have water.&rdquo;</em> Using the Hindi model for Urdu speakers is an approximation, it is documented as one, and it needs testing against real Karachi speech before anyone relies on it. The code-switching matters too, because Karachi workers mix Urdu and English constantly.</p>
+  <p class="fine">Source: <a href="https://github.com/ubaidai/heat-warning-agent">github.com/ubaidai/heat-warning-agent</a> &nbsp;&middot;&nbsp; MIT</p>
+</section>
+
+</div>
+
+<script type="module">
+const $ = (id) => document.getElementById(id);
+const logEl = $('log'), factsEl = $('facts'), statusEl = $('status'), verdictEl = $('verdict');
+
+const FACTS = {
+  understood:  { label: 'Understood',      state: null, evidence: null },
+  stopped:     { label: 'Stopped work',    state: null, evidence: null },
+  water:       { label: 'Water and shade', state: null, evidence: null },
+};
+
+function setStatus(t) { statusEl.textContent = t; }
+
+function addTurn(speaker, text) {
+  if (logEl.querySelector('.fine')) logEl.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = speaker;
+  d.textContent = (speaker === 'agent' ? 'agent   ' : 'worker  ') + text;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderFacts() {
+  factsEl.innerHTML = '';
+  for (const k of Object.keys(FACTS)) {
+    const f = FACTS[k];
+    const el = document.createElement('div');
+    el.className = 'fact' + (f.state === true ? ' yes' : f.state === false ? ' no' : '');
+    el.innerHTML =
+      `<h3>${f.label}</h3><div class="v">${f.state === null ? 'not established' : f.state ? 'established' : 'not established'}</div>` +
+      (f.evidence ? `<div class="ev">&ldquo;${f.evidence}&rdquo;</div>` : '');
+    factsEl.appendChild(el);
+  }
+}
+renderFacts();
+
+function reset() {
+  for (const k of Object.keys(FACTS)) { FACTS[k].state = null; FACTS[k].evidence = null; }
+  logEl.innerHTML = '<div class="fine" style="border:0">Nothing yet.</div>';
+  verdictEl.innerHTML = '';
+  renderFacts();
+}
+
+function applyTool(name, args) {
+  if (name === 'record_understanding') {
+    FACTS.understood.state = !!args.established; FACTS.understood.evidence = args.evidence;
+  } else if (name === 'record_work_stopped') {
+    FACTS.stopped.state = !!args.established; FACTS.stopped.evidence = args.evidence;
+    if (args.blocker) {
+      verdictEl.innerHTML = `<div class="note"><strong>Cannot stop:</strong> ${args.blocker}. Recorded as its own outcome, not as a partial success.</div>`;
+    }
+  } else if (name === 'record_water_and_shade') {
+    FACTS.water.state = !!args.has_water && !!args.has_shade; FACTS.water.evidence = args.evidence;
+  } else if (name === 'report_distress') {
+    verdictEl.innerHTML = `<div class="note" style="background:var(--alert);color:#fff"><strong>Distress escalated.</strong> ${args.symptoms} &mdash; call handed to a human.</div>`;
+  }
+  renderFacts();
+}
+
+// ── scripted walkthrough, so the page demonstrates the idea with no key ────
+const SCRIPT = [
+  ['agent',  'Hello Imran. Automated safety call for Al-Habib Construction. It is dangerously hot at your site. Can you hear me clearly?'],
+  ['worker', 'Haan.'],
+  ['tool',   'record_understanding', { established: false, evidence: 'Haan.' }],
+  ['agent',  'I need to know you have understood. Tell me what you are going to do in the next few minutes.'],
+  ['worker', 'Main neeche jaa raha hoon, gate ke paas chaaon mein baithunga.'],
+  ['tool',   'record_understanding', { established: true, evidence: 'Main neeche jaa raha hoon, gate ke paas chaaon mein baithunga.' }],
+  ['agent',  'Good. Have you put your tools down and left the scaffold?'],
+  ['worker', 'Haan, ruk gaya hoon.'],
+  ['tool',   'record_work_stopped', { established: true, evidence: 'Haan, ruk gaya hoon.' }],
+  ['agent',  'Where is your water, and is there shade where you are sitting?'],
+  ['worker', 'Paani bottle hai mere paas, aur gate ke paas chaaon hai.'],
+  ['tool',   'record_water_and_shade', { has_water: true, has_shade: true, evidence: 'Paani bottle hai mere paas, aur gate ke paas chaaon hai.' }],
+  ['agent',  'Thank you. Stay there for twenty minutes. Somebody will check on you.'],
+];
+
+$('walk').onclick = async () => {
+  reset(); setStatus('scripted call');
+  for (const step of SCRIPT) {
+    await new Promise((r) => setTimeout(r, 1100));
+    if (step[0] === 'tool') applyTool(step[1], step[2]);
+    else addTurn(step[0], step[1]);
+  }
+  setStatus('scripted call finished');
+};
+
+// ── live call ─────────────────────────────────────────────────────────────
+let socket = null, stream = null, ctx = null;
+
+$('start').onclick = async () => {
+  reset(); setStatus('requesting token');
+  let token;
+  try {
+    const r = await fetch('/api/token');
+    const j = await r.json();
+    if (!r.ok) {
+      setStatus(j.message ?? 'no token');
+      verdictEl.innerHTML = `<div class="note">${j.message ?? 'Live voice is unavailable.'}</div>`;
+      return;
+    }
+    token = j.token;
+  } catch {
+    setStatus('token request failed');
+    return;
+  }
+
+  setStatus('asking for microphone');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 16000 } });
+  } catch {
+    setStatus('microphone denied');
+    return;
+  }
+
+  socket = new WebSocket(`wss://agents.assemblyai.com/v1/ws?token=${encodeURIComponent(token)}`);
+
+  socket.onopen = () => {
+    setStatus('connected');
+    $('start').disabled = true; $('stop').disabled = false;
+    socket.send(JSON.stringify({
+      type: 'session.update',
+      session: {
+        system_prompt:
+          'You are making a short safety call to an outdoor worker whose site is dangerously hot. ' +
+          'Establish three things in order: that they understood, that they have stopped work, and that they have water and shade. ' +
+          'Never ask a question that can be answered yes or no. Ask what they are going to do and where they will sit. ' +
+          'A worker who says only yes or haan has not understood; ask again differently and record established=false. ' +
+          'If they describe dizziness, nausea, headache, confusion or having stopped sweating, call report_distress immediately and stop. ' +
+          'If they say they cannot stop, do not argue. Record why. Keep the whole call under ninety seconds.',
+        greeting: 'Hello. This is an automated safety call. It is dangerously hot where you are working right now. Can you hear me clearly?',
+        tools: window.__TOOLS__,
+      },
+    }));
+
+    ctx = new AudioContext({ sampleRate: 16000 });
+    const src = ctx.createMediaStreamSource(stream);
+    const node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = (e) => {
+      if (!socket || socket.readyState !== 1) return;
+      const f32 = e.inputBuffer.getChannelData(0);
+      const i16 = new Int16Array(f32.length);
+      for (let i = 0; i < f32.length; i++) {
+        const s = Math.max(-1, Math.min(1, f32[i]));
+        i16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      let bin = '';
+      const bytes = new Uint8Array(i16.buffer);
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      socket.send(JSON.stringify({ type: 'input.audio', audio: btoa(bin) }));
+    };
+    src.connect(node); node.connect(ctx.destination);
+  };
+
+  const queue = [];
+  let playing = false;
+  async function playNext() {
+    if (playing || !queue.length) return;
+    playing = true;
+    const b64 = queue.shift();
+    const bin = atob(b64);
+    const buf = new Int16Array(bin.length / 2);
+    for (let i = 0; i < buf.length; i++) buf[i] = (bin.charCodeAt(i * 2 + 1) << 8) | bin.charCodeAt(i * 2);
+    const ab = ctx.createBuffer(1, buf.length, 16000);
+    const ch = ab.getChannelData(0);
+    for (let i = 0; i < buf.length; i++) ch[i] = buf[i] / 32768;
+    const s = ctx.createBufferSource();
+    s.buffer = ab; s.connect(ctx.destination);
+    s.onended = () => { playing = false; playNext(); };
+    s.start();
+  }
+
+  socket.onmessage = (m) => {
+    let e; try { e = JSON.parse(m.data); } catch { return; }
+    if (e.type === 'user.transcript') addTurn('worker', e.transcript ?? e.text);
+    else if (e.type === 'agent.transcript') addTurn('agent', e.transcript ?? e.text);
+    else if (e.type === 'reply.audio_chunk') { queue.push(e.audio); playNext(); }
+    else if (e.type === 'tool.call') {
+      const args = typeof e.arguments === 'string' ? JSON.parse(e.arguments) : (e.arguments ?? {});
+      applyTool(e.name, args);
+      socket.send(JSON.stringify({
+        type: 'tool.result',
+        tool_call_id: e.tool_call_id ?? e.id,
+        result: JSON.stringify({ recorded: true }),
+      }));
+    } else if (e.type === 'session.error') setStatus('error: ' + (e.error ?? 'unknown'));
+  };
+
+  socket.onclose = () => { setStatus('call ended'); $('start').disabled = false; $('stop').disabled = true; };
+};
+
+$('stop').onclick = () => {
+  // session.end rather than just closing: closing the socket alone leaves the
+  // session resumable, and billable, for another thirty seconds.
+  try { socket?.send(JSON.stringify({ type: 'session.end' })); } catch {}
+  try { socket?.close(); } catch {}
+  stream?.getTracks().forEach((t) => t.stop());
+  ctx?.close();
+  setStatus('call ended');
+};
+
+window.__TOOLS__ = [
+  { type: 'function', name: 'record_understanding',
+    description: 'Record whether the worker demonstrated understanding. A bare yes, haan or ok is NOT understanding.',
+    parameters: { type: 'object', properties: {
+      established: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['established','evidence'] } },
+  { type: 'function', name: 'record_work_stopped',
+    description: 'Record whether the worker stopped outdoor work. If they cannot, capture why in blocker.',
+    parameters: { type: 'object', properties: {
+      established: { type: 'boolean' }, evidence: { type: 'string' }, blocker: { type: 'string' } },
+      required: ['established','evidence'] } },
+  { type: 'function', name: 'record_water_and_shade',
+    description: 'Record whether the worker has drinking water and shade.',
+    parameters: { type: 'object', properties: {
+      has_water: { type: 'boolean' }, has_shade: { type: 'boolean' }, evidence: { type: 'string' } },
+      required: ['has_water','has_shade','evidence'] } },
+  { type: 'function', name: 'report_distress',
+    description: 'Call immediately if the worker describes dizziness, nausea, headache, confusion, cramps or having stopped sweating.',
+    parameters: { type: 'object', properties: {
+      symptoms: { type: 'string' }, severity: { type: 'string', enum: ['concerning','urgent'] } },
+      required: ['symptoms','severity'] } },
+];
+</script>
+</body>
+</html>

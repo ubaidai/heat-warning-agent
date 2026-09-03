@@ -1,0 +1,5 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "web",
+  "functions": { "web/api/*.js": { "runtime": "@vercel/node@5" } }
+}
