@@ -1,0 +1,13 @@
+{
+  "name": "heat-warning-agent",
+  "version": "0.1.0",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "description": "A voice agent that phones outdoor workers when heat crosses a safe limit, and confirms they understood.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "simulate": "node scripts/simulate.mjs",
+    "test": "node scripts/outcome-check.mjs"
+  }
+}
