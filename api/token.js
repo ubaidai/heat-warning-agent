@@ -22,8 +22,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const r = await fetch('https://api.assemblyai.com/v1/token?expires_in_seconds=600', {
-      headers: { Authorization: key },
+    // agents.assemblyai.com, not api.assemblyai.com, and a Bearer prefix. The
+    // first deploy guessed both and got a 502 with "Not found" from upstream.
+    // expires_in_seconds must be 1-600, and tokens are single use, so a fresh
+    // one is minted per call rather than cached.
+    const r = await fetch('https://agents.assemblyai.com/v1/token?expires_in_seconds=600', {
+      headers: { Authorization: `Bearer ${key}` },
     });
     if (!r.ok) {
       const body = await r.text();
