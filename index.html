@@ -91,12 +91,12 @@
 
 <section>
   <h2>Try it</h2>
-  <p class="fine">Your browser microphone, streaming to AssemblyAI&rsquo;s Voice Agent API. Answer as a worker would. Try agreeing without understanding and watch what gets recorded.</p>
+  <p class="fine">Your browser microphone, streaming to AssemblyAI&rsquo;s Voice Agent API. Answer as a worker would, and try agreeing without understanding to see what gets recorded. The scripted call plays aloud and needs no key.</p>
 
   <div class="row">
     <button id="start" class="primary">Start the call</button>
     <button id="stop" disabled>End call</button>
-    <button id="walk">Play a scripted call instead</button>
+    <button id="walk">Play a scripted call (with sound)</button>
   </div>
   <div class="status" id="status">idle</div>
 
@@ -189,29 +189,73 @@ function applyTool(name, args) {
 
 // ── scripted walkthrough, so the page demonstrates the idea with no key ────
 const SCRIPT = [
-  ['agent',  'Hello Imran. Automated safety call for Al-Habib Construction. It is dangerously hot at your site. Can you hear me clearly?'],
-  ['worker', 'Haan.'],
-  ['tool',   'record_understanding', { established: false, evidence: 'Haan.' }],
+  ['agent',  'Hello Imran. This is an automated safety call for Al-Habib Construction. It is dangerously hot at your site right now. Can you hear me clearly?'],
+  ['worker', 'Yes.'],
+  ['tool',   'record_understanding', { established: false, evidence: 'Yes.' }],
   ['agent',  'I need to know you have understood. Tell me what you are going to do in the next few minutes.'],
-  ['worker', 'Main neeche jaa raha hoon, gate ke paas chaaon mein baithunga.'],
-  ['tool',   'record_understanding', { established: true, evidence: 'Main neeche jaa raha hoon, gate ke paas chaaon mein baithunga.' }],
+  ['worker', 'I am coming down off the scaffold. I will sit in the shade by the gate.'],
+  ['tool',   'record_understanding', { established: true, evidence: 'I am coming down off the scaffold. I will sit in the shade by the gate.' }],
   ['agent',  'Good. Have you put your tools down and left the scaffold?'],
-  ['worker', 'Haan, ruk gaya hoon.'],
-  ['tool',   'record_work_stopped', { established: true, evidence: 'Haan, ruk gaya hoon.' }],
+  ['worker', 'Yes, I have stopped.'],
+  ['tool',   'record_work_stopped', { established: true, evidence: 'Yes, I have stopped.' }],
   ['agent',  'Where is your water, and is there shade where you are sitting?'],
-  ['worker', 'Paani bottle hai mere paas, aur gate ke paas chaaon hai.'],
-  ['tool',   'record_water_and_shade', { has_water: true, has_shade: true, evidence: 'Paani bottle hai mere paas, aur gate ke paas chaaon hai.' }],
-  ['agent',  'Thank you. Stay there for twenty minutes. Somebody will check on you.'],
+  ['worker', 'I have a bottle with me, and there is shade by the gate.'],
+  ['tool',   'record_water_and_shade', { has_water: true, has_shade: true, evidence: 'I have a bottle with me, and there is shade by the gate.' }],
+  ['agent',  'Thank you. Stay there for twenty minutes. Someone will come and check on you.'],
 ];
 
+/* The scripted call speaks aloud using the browser's own speech synthesis, so
+   the page demonstrates a voice product without an API key or any credits. The
+   live call uses AssemblyAI's real voices; this is the fallback that keeps the
+   demo working if the key is missing or the credits run out mid-judging. */
+let voicesReady = false;
+function loadVoices() {
+  return new Promise((resolve) => {
+    if (voicesReady || !window.speechSynthesis) return resolve();
+    const v = speechSynthesis.getVoices();
+    if (v.length) { voicesReady = true; return resolve(); }
+    speechSynthesis.onvoiceschanged = () => { voicesReady = true; resolve(); };
+    setTimeout(resolve, 800);
+  });
+}
+
+function pickVoice(kind) {
+  if (!window.speechSynthesis) return null;
+  const all = speechSynthesis.getVoices().filter((v) => v.lang.startsWith('en'));
+  if (!all.length) return null;
+  // Two distinct voices where possible, so the caller and the worker are
+  // audibly different people rather than one narrator reading a script.
+  if (kind === 'agent') return all.find((v) => /female|samantha|zira|aria/i.test(v.name)) ?? all[0];
+  return all.find((v) => /male|david|daniel|alex/i.test(v.name)) ?? all[all.length - 1];
+}
+
+function say(text, kind) {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis) return resolve();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice(kind);
+    if (v) u.voice = v;
+    u.rate = kind === 'agent' ? 1.0 : 0.98;
+    u.pitch = kind === 'agent' ? 1.05 : 0.9;
+    u.onend = resolve;
+    u.onerror = resolve;
+    speechSynthesis.speak(u);
+  });
+}
+
 $('walk').onclick = async () => {
-  reset(); setStatus('scripted call');
+  reset(); setStatus('scripted call - playing');
+  $('walk').disabled = true;
+  try { speechSynthesis.cancel(); } catch {}
+  await loadVoices();
   for (const step of SCRIPT) {
-    await new Promise((r) => setTimeout(r, 1100));
-    if (step[0] === 'tool') applyTool(step[1], step[2]);
-    else addTurn(step[0], step[1]);
+    if (step[0] === 'tool') { applyTool(step[1], step[2]); await new Promise((r) => setTimeout(r, 500)); continue; }
+    addTurn(step[0], step[1]);
+    await say(step[1], step[0]);
+    await new Promise((r) => setTimeout(r, 350));
   }
   setStatus('scripted call finished');
+  $('walk').disabled = false;
 };
 
 // ── live call ─────────────────────────────────────────────────────────────
