@@ -87,8 +87,10 @@ export async function runCall(call, io, { apiKey, WebSocketImpl, onEvent = () =>
             : (event.arguments ?? {});
           const { result, urgent: isUrgent } = applyToolCall(outcome, event.name, args);
           pendingResults.push({
+            // call_id on both the call and the result. A wrong name here does
+            // not fail the tool, it ends the session with invalid_format.
             type: 'tool.result',
-            tool_call_id: event.tool_call_id ?? event.id,
+            call_id: event.call_id,
             result: JSON.stringify(result),
           });
           if (isUrgent) urgent = true;

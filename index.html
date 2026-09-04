@@ -360,14 +360,16 @@ $('start').onclick = async () => {
     else if (e.type === 'reply.audio') { queue.push(e.data); playNext(); }
     else if (e.type === 'session.ready') setStatus('connected - speak when it stops');
     else if (e.type === 'session.error') { setStatus('error: ' + JSON.stringify(e)); console.error('session.error', e); }
-    else if (String(e.type).includes('tool')) {
-      const name = e.name ?? e.tool_name;
-      const raw = e.arguments ?? e.args ?? {};
+    else if (e.type === 'tool.call') {
+      const raw = e.arguments ?? {};
       const args = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      if (name) applyTool(name, args);
+      applyTool(e.name, args);
+      // call_id, not tool_call_id. Getting this wrong does not fail the tool,
+      // it tears down the whole session with invalid_format — which is why the
+      // agent asked one question and then went silent.
       socket.send(JSON.stringify({
         type: 'tool.result',
-        tool_call_id: e.tool_call_id ?? e.id,
+        call_id: e.call_id,
         result: JSON.stringify({ recorded: true }),
       }));
     }
