@@ -295,13 +295,20 @@ $('start').onclick = async () => {
       type: 'session.update',
       session: {
         system_prompt:
-          'You are making a short safety call to an outdoor worker whose site is dangerously hot. ' +
-          'Establish three things in order: that they understood, that they have stopped work, and that they have water and shade. ' +
-          'Never ask a question that can be answered yes or no. Ask what they are going to do and where they will sit. ' +
-          'A worker who says only yes or haan has not understood; ask again differently and record established=false. ' +
-          'If they describe dizziness, nausea, headache, confusion or having stopped sweating, call report_distress immediately and stop. ' +
-          'If they say they cannot stop, do not argue. Record why. Keep the whole call under ninety seconds.',
-        greeting: 'Hello. This is an automated safety call. It is dangerously hot where you are working right now. Can you hear me clearly?',
+          'You are making a short safety call to an outdoor worker whose site has become dangerously hot. ' +
+          'Your job is to establish THREE things, in order, and you must not end the call until all three are recorded: ' +
+          '(1) they understood the warning, (2) they have stopped outdoor work, (3) they have drinking water and shade. ' +
+          'CRITICAL: a worker saying "yes", "ok", "haan", or "I can hear you" has NOT understood anything. ' +
+          'Hearing you is not understanding you. Never record understanding on that basis. ' +
+          'Understanding means they told you, in their own words, what they are going to do or where they are going to go. ' +
+          'If they answer with agreement instead of a plan, call record_understanding with established=false, then ask again: ' +
+          '"Tell me what you are going to do in the next few minutes." ' +
+          'Never ask a question that can be answered yes or no. Do not ask if they can hear you. ' +
+          'As soon as one fact is recorded, immediately ask about the next one. Keep moving. ' +
+          'If they describe dizziness, nausea, headache, confusion, cramps or having stopped sweating, ' +
+          'call report_distress at once and stop the script. ' +
+          'If they say they cannot stop working, do not argue. Record why in the blocker field and move on. ' +
+          'Keep the whole call under ninety seconds. Speak plainly and briefly.',
         tools: window.__TOOLS__,
       },
     }));
@@ -355,7 +362,7 @@ $('start').onclick = async () => {
     else if (e.type === 'transcript.agent') addTurn('agent', e.text);
     else if (e.type === 'reply.audio') { queue.push(e.data); playNext(); }
     else if (e.type === 'session.ready') setStatus('connected - speak when it stops');
-    else if (e.type === 'session.error') setStatus('error: ' + (e.error ?? 'unknown'));
+    else if (e.type === 'session.error') { setStatus('error: ' + JSON.stringify(e)); console.error('session.error', e); }
     else if (String(e.type).includes('tool')) {
       const name = e.name ?? e.tool_name;
       const raw = e.arguments ?? e.args ?? {};
@@ -369,7 +376,7 @@ $('start').onclick = async () => {
     }
   };
 
-  socket.onclose = () => { setStatus('call ended'); $('start').disabled = false; $('stop').disabled = true; };
+  socket.onclose = (ev) => { setStatus('call ended (' + ev.code + (ev.reason ? ': ' + ev.reason : '') + ')'); $('start').disabled = false; $('stop').disabled = true; };
 };
 
 $('stop').onclick = () => {

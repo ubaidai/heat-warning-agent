@@ -114,20 +114,22 @@ export const LANGUAGES = {
   en: {
     label: 'English',
     greeting: (name, employer) =>
-      `Hello ${name}. This is an automated safety call on behalf of ${employer}. ` +
-      `It is dangerously hot at your site right now. Can you hear me clearly?`,
+      `${name}, this is an automated safety call from ${employer}. The heat at your ` +
+      `site has passed a dangerous level and you need to stop work now. Tell me what ` +
+      `you are going to do.`,
   },
   hi: {
     label: 'Hindi (also used for Urdu speakers)',
     greeting: (name, employer) =>
-      `Namaste ${name}. Yeh ${employer} ki taraf se ek safety call hai. ` +
-      `Abhi aapke site par garmi khatarnaak hai. Kya aap meri awaaz saaf sun rahe hain?`,
+      `${name}, yeh ${employer} ki taraf se safety call hai. Aapke site par garmi ` +
+      `khatarnaak level par pahunch gayi hai, abhi kaam rokna hai. Bataiye aap ab kya karenge.`,
   },
   ar: {
     label: 'Arabic',
     greeting: (name, employer) =>
-      `Marhaban ${name}. This is an automated safety call from ${employer}. ` +
-      `The heat at your site is dangerous right now. Can you hear me clearly?`,
+      `${name}, this is an automated safety call from ${employer}. The heat at your ` +
+      `site has passed a dangerous level and you need to stop work now. Tell me what ` +
+      `you are going to do.`,
   },
 };
 
@@ -148,15 +150,23 @@ export function systemPrompt({ workerName, employerName, wbgtC, limitC, language
     '',
     `Speak ${lang.label}. Be brief. This whole call should take under ninety seconds.`,
     '',
-    'Your job is to establish three things, in this order:',
+    'Your job is to establish three things, in this order, and you must not end',
+    'the call until all three are recorded:',
     '1. That they understood the warning.',
     '2. That they have stopped, or are stopping, outdoor work.',
     '3. That they have drinking water and shade.',
     '',
     'Never ask a question that can be answered with yes or no.',
-    'Ask what they are going to do. Ask where they are going to sit.',
-    'A worker who says only "yes" or "haan" has not understood anything, and you',
-    'must not record understanding on that basis. Ask again, differently.',
+    'Do not ask whether they can hear you.',
+    '',
+    'Hearing you is not understanding you. A worker who says "yes", "ok", "haan"',
+    'or "I can hear you" has established nothing. Record established=false with',
+    'their words as evidence, then ask again: what are you going to do in the',
+    'next few minutes? Understanding means they told you a plan in their own',
+    'words. This is the whole point of the call and the easiest thing to get',
+    'wrong, because agreement sounds like comprehension.',
+    '',
+    'As soon as one fact is recorded, ask about the next one. Keep moving.',
     '',
     'If at any point they describe dizziness, nausea, headache, confusion, cramps,',
     'or say they have stopped sweating, call report_distress immediately and stop',
