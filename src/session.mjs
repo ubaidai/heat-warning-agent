@@ -6,10 +6,11 @@
  * to wire together, which is the reason to use this API rather than assembling
  * the stack by hand.
  *
- * Endpoint and event names are from the published API reference. The client
- * sends session.update, input.audio, tool.result and session.end; the server
- * sends session.ready, user.transcript, agent.transcript, reply.audio_chunk,
- * reply.done, tool.call and the session lifecycle events.
+ * Event names are taken from a live session, not from the reference page's
+ * prose headings, which differ from the wire format. The server sends
+ * transcript.agent and transcript.user carrying `text`, and reply.audio
+ * carrying `data` — not agent.transcript or reply.audio_chunk. Audio is PCM16
+ * at 24 kHz in both directions.
  */
 
 import { newOutcome, addTurn, applyToolCall, endCall } from './outcome.mjs';
@@ -68,16 +69,16 @@ export async function runCall(call, io, { apiKey, WebSocketImpl, onEvent = () =>
           io.onReady?.(socket);
           break;
 
-        case 'user.transcript':
-          addTurn(outcome, 'worker', event.transcript ?? event.text);
+        case 'transcript.user':
+          addTurn(outcome, 'worker', event.text);
           break;
 
-        case 'agent.transcript':
-          addTurn(outcome, 'agent', event.transcript ?? event.text);
+        case 'transcript.agent':
+          addTurn(outcome, 'agent', event.text);
           break;
 
-        case 'reply.audio_chunk':
-          io.onAudio?.(event.audio);
+        case 'reply.audio':
+          io.onAudio?.(event.data);
           break;
 
         case 'tool.call': {
