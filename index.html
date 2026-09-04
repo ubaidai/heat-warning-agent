@@ -288,29 +288,26 @@ $('start').onclick = async () => {
 
   socket = new WebSocket(`wss://agents.assemblyai.com/v1/ws?token=${encodeURIComponent(token)}`);
 
-  socket.onopen = () => {
+  socket.onopen = async () => {
     setStatus('connected');
     $('start').disabled = true; $('stop').disabled = false;
+
+    // One source of truth. The prompt lives in src/agent.mjs and is served by
+    // /api/agent-config, so improving it does not mean remembering to edit a
+    // second copy buried in this file. Two copies of a prompt is two prompts,
+    // and the one that gets improved is never the one that runs.
+    let cfg;
+    try {
+      const r = await fetch('/api/agent-config');
+      cfg = await r.json();
+    } catch (err) {
+      setStatus('could not load agent config: ' + err.message);
+      return;
+    }
+
     socket.send(JSON.stringify({
       type: 'session.update',
-      session: {
-        system_prompt:
-          'You are making a short safety call to an outdoor worker whose site has become dangerously hot. ' +
-          'Your job is to establish THREE things, in order, and you must not end the call until all three are recorded: ' +
-          '(1) they understood the warning, (2) they have stopped outdoor work, (3) they have drinking water and shade. ' +
-          'CRITICAL: a worker saying "yes", "ok", "haan", or "I can hear you" has NOT understood anything. ' +
-          'Hearing you is not understanding you. Never record understanding on that basis. ' +
-          'Understanding means they told you, in their own words, what they are going to do or where they are going to go. ' +
-          'If they answer with agreement instead of a plan, call record_understanding with established=false, then ask again: ' +
-          '"Tell me what you are going to do in the next few minutes." ' +
-          'Never ask a question that can be answered yes or no. Do not ask if they can hear you. ' +
-          'As soon as one fact is recorded, immediately ask about the next one. Keep moving. ' +
-          'If they describe dizziness, nausea, headache, confusion, cramps or having stopped sweating, ' +
-          'call report_distress at once and stop the script. ' +
-          'If they say they cannot stop working, do not argue. Record why in the blocker field and move on. ' +
-          'Keep the whole call under ninety seconds. Speak plainly and briefly.',
-        tools: window.__TOOLS__,
-      },
+      session: { system_prompt: cfg.system_prompt, greeting: cfg.greeting, tools: cfg.tools },
     }));
 
     ctx = new AudioContext({ sampleRate: 24000 });
@@ -389,27 +386,7 @@ $('stop').onclick = () => {
   setStatus('call ended');
 };
 
-window.__TOOLS__ = [
-  { type: 'function', name: 'record_understanding',
-    description: 'Record whether the worker demonstrated understanding. A bare yes, haan or ok is NOT understanding.',
-    parameters: { type: 'object', properties: {
-      established: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['established','evidence'] } },
-  { type: 'function', name: 'record_work_stopped',
-    description: 'Record whether the worker stopped outdoor work. If they cannot, capture why in blocker.',
-    parameters: { type: 'object', properties: {
-      established: { type: 'boolean' }, evidence: { type: 'string' }, blocker: { type: 'string' } },
-      required: ['established','evidence'] } },
-  { type: 'function', name: 'record_water_and_shade',
-    description: 'Record whether the worker has drinking water and shade.',
-    parameters: { type: 'object', properties: {
-      has_water: { type: 'boolean' }, has_shade: { type: 'boolean' }, evidence: { type: 'string' } },
-      required: ['has_water','has_shade','evidence'] } },
-  { type: 'function', name: 'report_distress',
-    description: 'Call immediately if the worker describes dizziness, nausea, headache, confusion, cramps or having stopped sweating.',
-    parameters: { type: 'object', properties: {
-      symptoms: { type: 'string' }, severity: { type: 'string', enum: ['concerning','urgent'] } },
-      required: ['symptoms','severity'] } },
-];
+
 </script>
 </body>
 </html>
