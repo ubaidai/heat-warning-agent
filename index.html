@@ -150,16 +150,28 @@ function addTurn(speaker, text) {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+/* Everything the model produces is a repetition of whatever somebody said into
+   a microphone on a public page, so none of it goes near innerHTML. Built as
+   nodes with textContent instead: markup in an evidence or blocker string then
+   displays as the characters it is, rather than being parsed and run. */
+function el(tag, className, text) {
+  const n = document.createElement(tag);
+  if (className) n.className = className;
+  if (text != null) n.textContent = text;
+  return n;
+}
+
 function renderFacts() {
-  factsEl.innerHTML = '';
+  factsEl.replaceChildren();
   for (const k of Object.keys(FACTS)) {
     const f = FACTS[k];
-    const el = document.createElement('div');
-    el.className = 'fact' + (f.state === true ? ' yes' : f.state === false ? ' no' : '');
-    el.innerHTML =
-      `<h3>${f.label}</h3><div class="v">${f.state === null ? 'not established' : f.state ? 'established' : 'not established'}</div>` +
-      (f.evidence ? `<div class="ev">&ldquo;${f.evidence}&rdquo;</div>` : '');
-    factsEl.appendChild(el);
+    const card = el('div', 'fact' + (f.state === true ? ' yes' : f.state === false ? ' no' : ''));
+    card.append(
+      el('h3', null, f.label),
+      el('div', 'v', f.state === true ? 'established' : 'not established'),
+    );
+    if (f.evidence) card.append(el('div', 'ev', '“' + f.evidence + '”'));
+    factsEl.appendChild(card);
   }
 }
 renderFacts();
@@ -177,12 +189,20 @@ function applyTool(name, args) {
   } else if (name === 'record_work_stopped') {
     FACTS.stopped.state = !!args.established; FACTS.stopped.evidence = args.evidence;
     if (args.blocker) {
-      verdictEl.innerHTML = `<div class="note"><strong>Cannot stop:</strong> ${args.blocker}. Recorded as its own outcome, not as a partial success.</div>`;
+      const note = el('div', 'note');
+      note.append(el('strong', null, 'Cannot stop:'), document.createTextNode(
+        ' ' + args.blocker + '. Recorded as its own outcome, not as a partial success.'));
+      verdictEl.replaceChildren(note);
     }
   } else if (name === 'record_water_and_shade') {
     FACTS.water.state = !!args.has_water && !!args.has_shade; FACTS.water.evidence = args.evidence;
   } else if (name === 'report_distress') {
-    verdictEl.innerHTML = `<div class="note" style="background:var(--alert);color:#fff"><strong>Distress escalated.</strong> ${args.symptoms} &mdash; call handed to a human.</div>`;
+    const note = el('div', 'note');
+    note.style.background = 'var(--alert)';
+    note.style.color = '#fff';
+    note.append(el('strong', null, 'Distress escalated.'), document.createTextNode(
+      ' ' + (args.symptoms ?? '') + ' — call handed to a human.'));
+    verdictEl.replaceChildren(note);
   }
   renderFacts();
 }
@@ -261,7 +281,22 @@ $('walk').onclick = async () => {
 // ── live call ─────────────────────────────────────────────────────────────
 let socket = null, stream = null, ctx = null;
 
+/* Releases the microphone and the audio graph. Called from both the End call
+   button and socket close, because a session the server ends must free the
+   device just as thoroughly as one the user ends. Safe to call twice. */
+function teardownAudio() {
+  try { stream?.getTracks().forEach((t) => t.stop()); } catch {}
+  try { ctx?.close(); } catch {}
+  stream = null;
+  ctx = null;
+}
+
 $('start').onclick = async () => {
+  // Disabled here rather than in socket.onopen. onopen does not fire until the
+  // connection is established, and every click before that started another
+  // token, another socket and another billed session, orphaning the previous
+  // microphone stream.
+  $('start').disabled = true;
   reset(); setStatus('requesting token');
   let token;
   try {
@@ -269,12 +304,14 @@ $('start').onclick = async () => {
     const j = await r.json();
     if (!r.ok) {
       setStatus(j.message ?? 'no token');
-      verdictEl.innerHTML = `<div class="note">${j.message ?? 'Live voice is unavailable.'}</div>`;
+      verdictEl.replaceChildren(el('div', 'note', j.message ?? 'Live voice is unavailable.'));
+      $('start').disabled = false;
       return;
     }
     token = j.token;
   } catch {
     setStatus('token request failed');
+    $('start').disabled = false;
     return;
   }
 
@@ -294,6 +331,7 @@ $('start').onclick = async () => {
     });
   } catch {
     setStatus('microphone denied');
+    $('start').disabled = false;
     return;
   }
 
@@ -301,7 +339,7 @@ $('start').onclick = async () => {
 
   socket.onopen = async () => {
     setStatus('connected');
-    $('start').disabled = true; $('stop').disabled = false;
+    $('stop').disabled = false;
 
     // One source of truth. The prompt lives in src/agent.mjs and is served by
     // /api/agent-config, so improving it does not mean remembering to edit a
@@ -313,6 +351,9 @@ $('start').onclick = async () => {
       cfg = await r.json();
     } catch (err) {
       setStatus('could not load agent config: ' + err.message);
+      try { socket.close(); } catch {}
+      teardownAudio();
+      $('start').disabled = false; $('stop').disabled = true;
       return;
     }
 
@@ -395,7 +436,14 @@ $('start').onclick = async () => {
     }
   };
 
-  socket.onclose = (ev) => { setStatus('call ended (' + ev.code + (ev.reason ? ': ' + ev.reason : '') + ')'); $('start').disabled = false; $('stop').disabled = true; };
+  socket.onclose = (ev) => {
+    setStatus('call ended (' + ev.code + (ev.reason ? ': ' + ev.reason : '') + ')');
+    // The server can end a call on its own: max session duration, an error, a
+    // dropped network. Without this the page looked idle while the microphone
+    // stayed open and the recording indicator stayed lit until the tab closed.
+    teardownAudio();
+    $('start').disabled = false; $('stop').disabled = true;
+  };
 };
 
 $('stop').onclick = () => {
@@ -403,8 +451,7 @@ $('stop').onclick = () => {
   // session resumable, and billable, for another thirty seconds.
   try { socket?.send(JSON.stringify({ type: 'session.end' })); } catch {}
   try { socket?.close(); } catch {}
-  stream?.getTracks().forEach((t) => t.stop());
-  ctx?.close();
+  teardownAudio();
   setStatus('call ended');
 };
 

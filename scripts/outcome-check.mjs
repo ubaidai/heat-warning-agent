@@ -38,6 +38,25 @@ const start = (lang = 'hi') => newOutcome({ workerId: 'w1', alertId: 'a1', langu
   is('and it counts as reached', s.reached, true);
 }
 
+// ── 1b. water but no shade ─────────────────────────────────────────────────
+// A bottle in your hand and nowhere out of the sun is not a safe worker. This
+// used to count as the third fact established and come back fully_confirmed.
+{
+  const o = start();
+  addTurn(o, 'worker', 'I have water but there is no shade anywhere here.');
+  applyToolCall(o, 'record_understanding', { established: true, evidence: 'I will come down.' });
+  applyToolCall(o, 'record_work_stopped', { established: true, evidence: 'I have stopped.' });
+  applyToolCall(o, 'record_water_and_shade', {
+    has_water: true, has_shade: false,
+    evidence: 'I have water but there is no shade anywhere here.',
+  });
+  endCall(o, 'all_facts_established');
+
+  const s = summarise(o);
+  is('water without shade is not a third established fact', s.factsEstablished, 2);
+  is('and the call is not fully confirmed', s.status, 'partially_confirmed');
+}
+
 // ── 2. the reflexive yes ───────────────────────────────────────────────────
 // The one this whole design exists for. Someone said yes to an authoritative
 // voice on a phone. That is not comprehension, and recording it as such would

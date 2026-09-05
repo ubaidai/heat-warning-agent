@@ -40,12 +40,18 @@ export async function runCall(call, io, { apiKey, WebSocketImpl, onEvent = () =>
   // deliberately server-only so the permanent key never reaches a client.
   const socket = new WS(ENDPOINT, { headers: { Authorization: `Bearer ${apiKey}` } });
 
-  /** Tool results are batched and flushed on reply.done, as the API expects. */
-  let pendingResults = [];
   let urgent = false;
 
   return await new Promise((resolve, reject) => {
+    // finish is reachable from reply.done, session.error, session.ended and the
+    // close handler, and more than one of those fires on a normal teardown.
+    // resolve() is idempotent but endCall is not: a second call rewrote
+    // endedBecause, so a distress escalation could end up recorded as
+    // 'server_ended'. First reason wins, because it is the true one.
+    let finished = false;
     const finish = (reason) => {
+      if (finished) return;
+      finished = true;
       endCall(outcome, reason);
       try { socket.send(JSON.stringify({ type: 'session.end' })); } catch { /* already gone */ }
       resolve(outcome);
@@ -86,22 +92,29 @@ export async function runCall(call, io, { apiKey, WebSocketImpl, onEvent = () =>
             ? JSON.parse(event.arguments)
             : (event.arguments ?? {});
           const { result, urgent: isUrgent } = applyToolCall(outcome, event.name, args);
-          pendingResults.push({
-            // call_id on both the call and the result. A wrong name here does
-            // not fail the tool, it ends the session with invalid_format.
-            type: 'tool.result',
-            call_id: event.call_id,
-            result: JSON.stringify(result),
-          });
+          // Sent immediately rather than queued until reply.done. Holding them
+          // meant that a session ending first — an error, a dropped socket,
+          // the distress path — discarded every acknowledgement silently, while
+          // the browser client, which sends on receipt, worked. Two
+          // implementations of one protocol, and only the untested one lost
+          // messages.
+          //
+          // call_id on both the call and the result. A wrong name here does not
+          // fail the tool, it ends the session with invalid_format.
+          try {
+            socket.send(JSON.stringify({
+              type: 'tool.result',
+              call_id: event.call_id,
+              result: JSON.stringify(result),
+            }));
+          } catch (err) {
+            outcome.toolCalls.push({ name: event.name, error: `ack failed: ${err.message}` });
+          }
           if (isUrgent) urgent = true;
           break;
         }
 
         case 'reply.done':
-          // The reference says to send accumulated tool results on this event.
-          for (const r of pendingResults) socket.send(JSON.stringify(r));
-          pendingResults = [];
-
           if (urgent) {
             // A worker describing heat illness is not a conversation to finish.
             finish('distress_escalated');

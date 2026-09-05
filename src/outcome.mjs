@@ -107,10 +107,17 @@ export function endCall(outcome, reason) {
  * alerts. Whether the warning arrived is the only claim this product makes.
  */
 export function summarise(outcome) {
+  // Water AND shade. Counting water alone let a worker with a bottle and no
+  // shade anywhere on site come back as fully confirmed, which is a clean
+  // record for somebody standing in direct sun — the exact condition the call
+  // exists to find.
+  const hasBoth =
+    outcome.waterAndShade.hasWater === true && outcome.waterAndShade.hasShade === true;
+
   const established = [
     outcome.understood.established,
     outcome.stoppedWork.established,
-    outcome.waterAndShade.hasWater,
+    hasBoth,
   ].filter((v) => v === true).length;
 
   const reached = outcome.transcript.some((t) => t.speaker === 'worker');
