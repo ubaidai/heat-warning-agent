@@ -280,7 +280,18 @@ $('start').onclick = async () => {
 
   setStatus('asking for microphone');
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, sampleRate: 24000 } });
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        sampleRate: 24000,
+        // Passing any constraints object drops the browser defaults, so these
+        // have to be asked for explicitly. Without cancellation the agent hears
+        // its own voice back and waits for the "user" to stop talking.
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
   } catch {
     setStatus('microphone denied');
     return;
@@ -326,7 +337,16 @@ $('start').onclick = async () => {
       for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
       socket.send(JSON.stringify({ type: 'input.audio', audio: btoa(bin) }));
     };
-    src.connect(node); node.connect(ctx.destination);
+    // A ScriptProcessorNode only fires onaudioprocess while it is connected to
+    // something, but connecting it straight to destination puts the microphone
+    // out of the speakers. That fed the agent's own voice back into its ears
+    // and left it waiting for a turn that never ended. Terminate into silence
+    // instead: the node still runs, nothing is played back.
+    const mute = ctx.createGain();
+    mute.gain.value = 0;
+    src.connect(node);
+    node.connect(mute);
+    mute.connect(ctx.destination);
   };
 
   const queue = [];
