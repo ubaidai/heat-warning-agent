@@ -261,7 +261,7 @@ const logEl = $('log'), factsEl = $('facts'), statusEl = $('status'), verdictEl 
 const FACTS = {
   understood:  { label: 'Understood',      state: null, evidence: null },
   stopped:     { label: 'Stopped work',    state: null, evidence: null },
-  water:       { label: 'Water and shade', state: null, evidence: null },
+  water:       { label: 'Water and shade', state: null, evidence: null, detail: null },
 };
 
 // Water and shade are two questions, usually answered at two different points
@@ -272,6 +272,7 @@ let hasWater = null, hasShade = null;
 /** Only an actual boolean counts. Absent means not established, never false. */
 const tri = (v) => (typeof v === 'boolean' ? v : null);
 const keep = (next, current) => (next === null ? current : next);
+const stateWord = (v) => (v === true ? 'yes' : v === false ? 'no' : 'not established');
 
 function setStatus(t) { statusEl.textContent = t; }
 
@@ -299,7 +300,11 @@ function renderFacts() {
     const card = el('div', 'fact' + (f.state === true ? ' yes' : f.state === false ? ' no' : ''));
     card.append(
       el('h3', null, f.label),
-      el('div', 'v', f.state === true ? 'established' : 'not established'),
+      // `detail` spells out a fact that is half known. "Not established" is
+      // true of water and shade when only one of them was answered, but it
+      // hides which one, and which one is exactly what a safety manager
+      // reading this needs to go and ask about.
+      el('div', 'v', f.detail ?? (f.state === true ? 'established' : 'not established')),
     );
     if (f.evidence) card.append(el('div', 'ev', '“' + f.evidence + '”'));
     factsEl.appendChild(card);
@@ -308,7 +313,7 @@ function renderFacts() {
 renderFacts();
 
 function reset() {
-  for (const k of Object.keys(FACTS)) { FACTS[k].state = null; FACTS[k].evidence = null; }
+  for (const k of Object.keys(FACTS)) { FACTS[k].state = null; FACTS[k].evidence = null; FACTS[k].detail = null; }
   hasWater = null; hasShade = null;
   logEl.replaceChildren(el('div', 'idle', 'Nothing yet.'));
   verdictEl.replaceChildren();
@@ -322,8 +327,11 @@ function applyTool(name, args) {
     FACTS.stopped.state = !!args.established; FACTS.stopped.evidence = args.evidence;
     if (args.blocker) {
       const note = el('div', 'note');
+      // The model's blocker sometimes ends in a full stop and sometimes does
+      // not, and "Paid per floor.. Recorded as" is not a sentence.
+      const why = String(args.blocker).trim().replace(/[.\s]+$/, '');
       note.append(el('strong', null, 'Cannot stop:'), document.createTextNode(
-        ' ' + args.blocker + '. Recorded as its own outcome, not as a partial success.'));
+        ' ' + why + '. Recorded as its own outcome, not as a partial success.'));
       verdictEl.replaceChildren(note);
     }
   } else if (name === 'record_water_and_shade') {
@@ -334,6 +342,9 @@ function applyTool(name, args) {
     FACTS.water.state = hasWater === null && hasShade === null
       ? null
       : hasWater === true && hasShade === true;
+    FACTS.water.detail = FACTS.water.state === true
+      ? 'established'
+      : `water ${stateWord(hasWater)}, shade ${stateWord(hasShade)}`;
     FACTS.water.evidence = args.evidence ?? FACTS.water.evidence;
   } else if (name === 'report_distress') {
     const note = el('div', 'note urgent');
