@@ -121,7 +121,10 @@ export async function runCall(call, io, { apiKey, WebSocketImpl, onEvent = () =>
           } else if (
             outcome.understood.established !== null &&
             outcome.stoppedWork.established !== null &&
-            outcome.waterAndShade.hasWater !== null
+            // Both. Shade used to be missing from this check, so a call could
+            // hang up as complete having never asked where the man would sit.
+            outcome.waterAndShade.hasWater !== null &&
+            outcome.waterAndShade.hasShade !== null
           ) {
             finish('all_facts_established');
           }

@@ -4,129 +4,254 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Heat Warning Agent</title>
-<meta name="description" content="A voice agent that phones outdoor workers when heat crosses a dangerous limit, and confirms they understood.">
+<meta name="description" content="A voice agent that calls outdoor workers when heat turns dangerous, then records whether they understood.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-  :root {
-    --ground:#FBF9F5; --surface:#FFF; --alt:#F2EEE6;
-    --ink:#1C1A17; --soft:#4A453D; --muted:#7A7368; --rule:#DFD8CB;
-    --amber:#C25708; --amber-soft:#F5E4D2; --shade:#2E3A34; --alert:#A82D22;
+  /* One theme, following the system. One accent. One radius. */
+  :root{
+    --ground:#F6F4F1; --surface:#FFFFFF; --sunk:#EDEAE5;
+    --ink:#16181A; --soft:#4B4F52; --muted:#63676B; --rule:#DCD8D2;
+    --accent:#C0451B; --accent-weak:#F7E5DC; --on-accent:#FFFFFF;
+    --good:#2F5D4A; --bad:#A82616;
+    --r:4px;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ground:#131110; --surface:#1B1917; --alt:#232019;
-      --ink:#F2EEE6; --soft:#C6BFB3; --muted:#8E8678; --rule:#35302A;
-      --amber:#F0862B; --amber-soft:#3A2513; --shade:#9CB4A6; --alert:#E86C5C;
+  @media (prefers-color-scheme:dark){
+    :root{
+      --ground:#0F1113; --surface:#171A1C; --sunk:#1D2124;
+      --ink:#EDEBE8; --soft:#B4B8BB; --muted:#8C9197; --rule:#2A2F33;
+      --accent:#F2703F; --accent-weak:#331A10; --on-accent:#141618;
+      --good:#7FB79C; --bad:#E8705E;
     }
   }
   *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
   body{margin:0;background:var(--ground);color:var(--ink);
     font-family:"Barlow","Helvetica Neue",Arial,sans-serif;font-size:17px;line-height:1.6;
     -webkit-font-smoothing:antialiased}
-  .wrap{max-width:900px;margin:0 auto;padding:0 24px 80px}
-  header{padding:64px 0 24px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+
+  /* nav: one line, 64px */
+  nav{height:64px;display:flex;align-items:center;justify-content:space-between;
+    gap:16px;border-bottom:1px solid var(--rule)}
+  .mark{font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;font-size:20px;
+    letter-spacing:.01em;text-transform:uppercase;white-space:nowrap}
+  .navlinks{display:flex;gap:22px;align-items:center;font-size:15px}
+  .navlinks a{color:var(--soft);text-decoration:none;white-space:nowrap}
+  .navlinks a:hover{color:var(--accent)}
+
+  /* hero: asymmetric split, copy left, the working console right */
+  .hero{display:grid;grid-template-columns:1fr;gap:40px;padding:52px 0 64px;align-items:start}
+  @media(min-width:960px){.hero{grid-template-columns:1.05fr 1fr;gap:64px;padding-top:64px}}
   .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.14em;
-    text-transform:uppercase;color:var(--amber);margin:0 0 12px}
+    text-transform:uppercase;color:var(--accent);margin:0 0 16px}
   h1{font-family:"Barlow Condensed","Arial Narrow",Arial,sans-serif;font-weight:700;
-    font-size:clamp(40px,7vw,68px);line-height:1;margin:0;letter-spacing:-.015em}
-  .lead{font-size:19px;color:var(--soft);max-width:56ch;margin:18px 0 0}
-  .threshold{height:3px;border:0;margin:22px 0 0;
-    background:linear-gradient(to right,var(--amber) 0 38%,var(--rule) 38% 100%)}
-  h2{font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;
-    font-size:clamp(24px,3.6vw,32px);margin:0 0 6px;line-height:1.1}
-  section{padding:40px 0;border-bottom:1px solid var(--rule)}
-  section:last-of-type{border-bottom:0}
-  p{margin:0 0 14px;max-width:64ch}
-  .fine{font-size:15px;color:var(--muted);max-width:64ch}
-  button{font:inherit;font-weight:600;cursor:pointer;border-radius:3px;border:1px solid var(--rule);
-    background:var(--surface);color:var(--ink);padding:11px 20px}
-  button.primary{background:var(--amber);border-color:var(--amber);color:#fff}
-  button:disabled{opacity:.45;cursor:not-allowed}
-  button:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0}
-  .panel{background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:20px 22px}
-  .status{font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--muted)}
-  #log{font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.7;
-    max-height:260px;overflow-y:auto;margin-top:14px}
-  #log div{padding:3px 0;border-bottom:1px solid var(--rule)}
-  #log .agent{color:var(--amber)}
+    font-size:clamp(46px,6.4vw,76px);line-height:1.02;margin:0;letter-spacing:-.018em;
+    max-width:11ch}
+  .lead{font-size:20px;color:var(--soft);max-width:44ch;margin:20px 0 0}
+  .cta{display:flex;gap:10px;flex-wrap:wrap;margin:30px 0 0}
+  .hint{font-size:14.5px;color:var(--muted);margin:16px 0 0;max-width:46ch}
+
+  button{font:inherit;font-weight:600;cursor:pointer;border-radius:var(--r);
+    border:1px solid var(--rule);background:var(--surface);color:var(--ink);
+    padding:12px 20px;white-space:nowrap;
+    transition:transform .12s ease,border-color .12s ease,background .12s ease}
+  button:hover:not(:disabled){border-color:var(--ink)}
+  button:active:not(:disabled){transform:translateY(1px)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  button.primary:hover:not(:disabled){background:var(--ink);border-color:var(--ink);color:var(--ground)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  button.ghost{border:0;background:none;color:var(--muted);padding:4px 6px;
+    font-family:"IBM Plex Mono",monospace;font-size:12px;letter-spacing:.06em;
+    text-transform:uppercase}
+  button.ghost:hover:not(:disabled){color:var(--accent);border-color:transparent}
+
+  /* the console: a real working panel, not a picture of one */
+  .console{background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+    overflow:hidden}
+  .chead{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:11px 16px;border-bottom:1px solid var(--rule);background:var(--sunk)}
+  .chead h2{font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--muted);margin:0;font-weight:500}
+  .status{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--soft);
+    text-align:right;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap}
+  #log{font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.65;
+    height:250px;overflow-y:auto;padding:4px 16px}
+  #log div{padding:7px 0;border-bottom:1px solid var(--rule)}
+  #log div:last-child{border-bottom:0}
+  #log .agent{color:var(--accent)}
   #log .worker{color:var(--ink);font-weight:500}
-  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:18px}
-  .fact{border:1px solid var(--rule);border-left:3px solid var(--rule);border-radius:3px;
-    padding:14px 16px;background:var(--surface)}
-  .fact h3{font-family:"Barlow Condensed",Arial,sans-serif;font-size:17px;margin:0 0 4px;font-weight:600}
-  .fact .v{font-family:"IBM Plex Mono",monospace;font-size:12px;text-transform:uppercase;
-    letter-spacing:.06em;color:var(--muted)}
-  .fact.yes{border-left-color:var(--shade)} .fact.yes .v{color:var(--shade)}
-  .fact.no{border-left-color:var(--alert)} .fact.no .v{color:var(--alert)}
-  .fact .ev{font-size:14px;color:var(--soft);margin-top:8px;font-style:italic}
-  .note{background:var(--amber-soft);color:var(--amber);border-radius:3px;padding:12px 16px;
-    font-size:15px;margin:16px 0}
-  ul.plain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
-  ul.plain li{padding-left:20px;position:relative;max-width:64ch}
-  ul.plain li::before{content:"";position:absolute;left:0;top:11px;width:9px;height:2px;background:var(--amber)}
-  a{color:var(--amber)}
-  code{font-family:"IBM Plex Mono",monospace;font-size:.92em;background:var(--alt);padding:1px 5px;border-radius:2px}
+  #log .idle{color:var(--muted);border-bottom:0}
+  .facts{display:grid;grid-template-columns:1fr;gap:1px;background:var(--rule);
+    border-top:1px solid var(--rule)}
+  @media(min-width:520px){.facts{grid-template-columns:repeat(3,1fr)}}
+  .fact{background:var(--surface);padding:13px 16px}
+  .fact h3{font-family:"Barlow Condensed",Arial,sans-serif;font-size:16px;margin:0;
+    font-weight:600;letter-spacing:.01em}
+  .fact .v{font-family:"IBM Plex Mono",monospace;font-size:11px;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--muted);margin-top:3px}
+  .fact.yes .v{color:var(--good)} .fact.no .v{color:var(--bad)}
+  .fact .ev{font-size:13.5px;color:var(--soft);margin-top:7px;line-height:1.45}
+  .note{padding:14px 16px;font-size:15px;background:var(--accent-weak);color:var(--ink);
+    border-top:1px solid var(--rule);border-left:3px solid var(--accent)}
+  .note.urgent{background:var(--bad);color:var(--on-accent);border-left-color:var(--bad)}
+
+  /* shared section furniture */
+  section{padding:64px 0;border-top:1px solid var(--rule)}
+  h2.head{font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;
+    font-size:clamp(28px,4vw,42px);margin:0 0 18px;line-height:1.08;letter-spacing:-.01em;
+    max-width:20ch}
+  p{margin:0 0 16px;max-width:62ch}
+  .fine{font-size:15px;color:var(--muted);max-width:62ch}
+  a{color:var(--accent)}
+
+  /* why: editorial column with a pulled figure */
+  .why{display:grid;grid-template-columns:1fr;gap:32px}
+  @media(min-width:960px){.why{grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:64px}}
+  .figure{border-left:3px solid var(--accent);padding:4px 0 4px 20px;align-self:start}
+  .figure .n{font-family:"Barlow Condensed",Arial,sans-serif;font-weight:700;
+    font-size:clamp(52px,7vw,74px);line-height:1;letter-spacing:-.02em}
+  .figure .cap{font-size:15px;color:var(--soft);margin:8px 0 0;max-width:30ch}
+
+  /* what it records: four cells, four kinds of tile */
+  .grid4{display:grid;grid-template-columns:1fr;gap:16px}
+  @media(min-width:820px){
+    .grid4{grid-template-columns:1fr 1fr}
+    .grid4 .wide{grid-column:1 / -1}
+  }
+  .tile{border:1px solid var(--rule);border-radius:var(--r);padding:22px 24px;
+    background:var(--surface)}
+  .tile.plain{background:var(--sunk)}
+  .tile.flag{background:var(--accent-weak);border-color:var(--accent)}
+  .tile h3{font-family:"Barlow Condensed",Arial,sans-serif;font-size:21px;margin:0 0 8px;
+    font-weight:700;letter-spacing:.005em}
+  .tile.flag h3{color:var(--ink)}
+  .tile p{margin:0;font-size:16px;color:var(--soft);max-width:56ch}
+
+  /* record: mono block beside prose */
+  .record{display:grid;grid-template-columns:1fr;gap:32px;align-items:start}
+  @media(min-width:960px){.record{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px}}
+  pre{font-family:"IBM Plex Mono",monospace;font-size:13px;line-height:1.75;margin:0;
+    background:var(--surface);border:1px solid var(--rule);border-radius:var(--r);
+    padding:20px 22px;overflow-x:auto;color:var(--soft)}
+  pre b{color:var(--ink);font-weight:500}
+  pre i{color:var(--accent);font-style:normal}
+  code{font-family:"IBM Plex Mono",monospace;font-size:.9em;background:var(--sunk);
+    padding:1px 5px;border-radius:2px}
+  figcaption{font-size:14px;color:var(--muted);margin-top:10px}
+
+  footer{border-top:1px solid var(--rule);padding:34px 0 56px;font-size:15px;
+    color:var(--muted);display:flex;flex-wrap:wrap;gap:10px 28px}
+
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+
 <div class="wrap">
+<nav>
+  <span class="mark">Heat Warning Agent</span>
+  <span class="navlinks">
+    <a href="#record">The record</a>
+    <a href="https://github.com/ubaidai/heat-warning-agent">Source</a>
+  </span>
+</nav>
 
-<header>
-  <p class="eyebrow">AssemblyAI Voice Agent Hackathon</p>
-  <h1>Heat Warning Agent</h1>
-  <hr class="threshold">
-  <p class="lead">It phones outdoor workers when heat crosses a dangerous limit, and confirms they understood. Not that they answered. That they understood.</p>
-</header>
-
-<section>
-  <h2>A worker who says &ldquo;haan&rdquo; has not understood anything</h2>
-  <p>Karachi&rsquo;s 2015 heatwave killed over a thousand people in a week, most of them working outdoors. The forecasts existed. They never arrived.</p>
-  <p>The obvious fix is to phone people. The non-obvious problem is that reflexive agreement to an authoritative voice on a phone is the <em>default</em> behaviour. A naive flow records that yes as a successful warning, and the employer ends up holding a compliance record full of agreement that meant nothing, which is worse than holding no record at all.</p>
-  <p><strong>So this agent never asks a question that &ldquo;yes&rdquo; can answer.</strong> It asks what you are going to do, and where you are going to sit.</p>
-</section>
-
-<section>
-  <h2>Try it</h2>
-  <p class="fine">Your browser microphone, streaming to AssemblyAI&rsquo;s Voice Agent API. Answer as a worker would, and try agreeing without understanding to see what gets recorded. The scripted call plays aloud and needs no key.</p>
-
-  <div class="row">
-    <button id="start" class="primary">Start the call</button>
-    <button id="stop" disabled>End call</button>
-    <button id="walk">Play a scripted call (with sound)</button>
-  </div>
-  <div class="status" id="status">idle</div>
-
-  <div class="panel" style="margin-top:18px">
-    <div class="status">TRANSCRIPT</div>
-    <div id="log"><div class="fine" style="border:0">Nothing yet.</div></div>
+<div class="hero">
+  <div>
+    <p class="eyebrow">AssemblyAI Voice Agent Hackathon</p>
+    <h1>The warning has to land.</h1>
+    <p class="lead">A voice agent that calls outdoor workers when heat turns dangerous, then records whether they understood.</p>
+    <div class="cta">
+      <button id="start" class="primary">Start the call</button>
+      <button id="walk">Play a scripted call</button>
+    </div>
+    <p class="hint">The live call uses your microphone. The scripted one plays aloud and needs no key. Answer as a worker would, and try agreeing without understanding to see what gets written down.</p>
   </div>
 
-  <div class="facts" id="facts"></div>
-  <div id="verdict"></div>
+  <div class="console">
+    <div class="chead">
+      <h2>Call</h2>
+      <span class="status" id="status">idle</span>
+      <button id="stop" class="ghost" disabled>End call</button>
+    </div>
+    <div id="log"><div class="idle">Nothing yet.</div></div>
+    <div class="facts" id="facts"></div>
+    <div id="verdict"></div>
+  </div>
+</div>
+
+<section>
+  <div class="why">
+    <div>
+      <h2 class="head">A worker who says yes has not understood</h2>
+      <p>Karachi's 2015 heatwave killed more than a thousand people in a single week, most of them working outdoors. The forecasts existed. They never reached the men on the scaffold.</p>
+      <p>Phoning people is the obvious fix. The harder problem is that agreeing with an authoritative voice on a phone is the ordinary human response, not the exception. A naive flow files that yes as a delivered warning, and the employer ends up holding a compliance record full of agreement that meant nothing, which is worse than holding no record at all.</p>
+      <p><strong>So the agent never asks a question that yes can answer.</strong> It asks what you are going to do, and where you are going to sit.</p>
+    </div>
+    <div class="figure">
+      <div class="n">1,000+</div>
+      <p class="cap">Dead in Karachi in one week, June 2015. The heat was forecast. The warning was not delivered.</p>
+    </div>
+  </div>
 </section>
 
 <section>
-  <h2>What it records</h2>
-  <ul class="plain">
-    <li><strong>Understood the warning.</strong> Only true if they said something showing comprehension. Their own words are kept as evidence beside the judgement, so a reviewer can check the call rather than trust it.</li>
-    <li><strong>Stopped work.</strong> And if they cannot, <em>why</em>. &ldquo;I&rsquo;m paid per delivery&rdquo; is the most useful thing a call can learn, and no thermometer can tell you it.</li>
-    <li><strong>Has water and shade.</strong></li>
-    <li><strong>Distress interrupt.</strong> Dizziness, nausea, confusion or having stopped sweating abandons the script immediately and escalates to a human.</li>
-  </ul>
-  <p class="fine" style="margin-top:16px">Every fact starts <code>null</code>, meaning not established, which is a different state from false. A call that drops before the water question must never record that the worker had no water.</p>
+  <h2 class="head">What a call has to establish</h2>
+  <div class="grid4">
+    <div class="tile">
+      <h3>Understood the warning</h3>
+      <p>True only when the worker said something that shows comprehension. Their own words are stored beside the judgement, so a reviewer can check the call rather than trust it.</p>
+    </div>
+    <div class="tile plain">
+      <h3>Stopped work, or why not</h3>
+      <p>"I am paid per delivery" is the most useful thing a call can learn, and no thermometer reports it. A refusal is filed as its own outcome, never as a partial success.</p>
+    </div>
+    <div class="tile plain">
+      <h3>Water and shade, both</h3>
+      <p>A bottle in your hand with nowhere to get out of the sun is not a safe worker, so one without the other does not count as established.</p>
+    </div>
+    <div class="tile flag wide">
+      <h3>Distress, which stops everything</h3>
+      <p>Dizziness, nausea, confusion or having stopped sweating abandons the script on the spot and hands the call to a human. Nothing else on the list matters once that happens.</p>
+    </div>
+  </div>
 </section>
 
-<section>
-  <h2>Urdu, honestly</h2>
-  <p>AssemblyAI streams 18 languages with native code-switching. Urdu is not among them. Hindi is.</p>
-  <p>Spoken Urdu and spoken Hindi are the same language. They diverge in script and in formal register, not in <em>&ldquo;I stopped, I have water.&rdquo;</em> Using the Hindi model for Urdu speakers is an approximation, it is documented as one, and it needs testing against real Karachi speech before anyone relies on it. The code-switching matters too, because Karachi workers mix Urdu and English constantly.</p>
-  <p class="fine">Source: <a href="https://github.com/ubaidai/heat-warning-agent">github.com/ubaidai/heat-warning-agent</a> &nbsp;&middot;&nbsp; MIT</p>
+<section id="record">
+  <div class="record">
+    <div>
+      <h2 class="head">What the employer is left holding</h2>
+      <p>An alert that was sent proves nothing. A call where someone said what they were going to do, in their own words, with the time and the outcome attached, is the thing an employer can produce when a regulator asks whether they acted.</p>
+      <p>Every fact starts <code>null</code>, meaning not established, which is a different state from false. A call that drops before the water question must never record that the worker had no water.</p>
+      <p class="fine">Languages: English, Hindi and Arabic. AssemblyAI's streaming models do not include Urdu, so Urdu speakers are served by the Hindi model. The two diverge in script and formal register rather than in "I have stopped, I have water", but it is an approximation, and it needs testing against Karachi speech before anyone relies on it.</p>
+    </div>
+    <figure style="margin:0">
+<pre><b>{</b>
+  "status":           <i>"refused_or_unable_to_stop"</i>,
+  "reached":          <b>true</b>,
+  "factsEstablished": <b>2</b>,
+  "of":               <b>3</b>,
+  "blocker":          <i>"Paid per delivery, stopping
+                       costs him income"</i>,
+  "distress":         <b>null</b>,
+  "durationSeconds":  <b>74</b>
+<b>}</b></pre>
+      <figcaption>One call, as stored. Example record.</figcaption>
+    </figure>
+  </div>
 </section>
+</div>
 
+<div class="wrap">
+<footer>
+  <span>MIT licensed</span>
+  <span><a href="https://github.com/ubaidai/heat-warning-agent">github.com/ubaidai/heat-warning-agent</a></span>
+  <span>Voice by AssemblyAI</span>
+</footer>
 </div>
 
 <script type="module">
@@ -139,16 +264,16 @@ const FACTS = {
   water:       { label: 'Water and shade', state: null, evidence: null },
 };
 
-function setStatus(t) { statusEl.textContent = t; }
+// Water and shade are two questions, usually answered at two different points
+// in the call. Held separately so a tool call that mentions only one does not
+// read as a denial of the other. Same rule as src/outcome.mjs.
+let hasWater = null, hasShade = null;
 
-function addTurn(speaker, text) {
-  if (logEl.querySelector('.fine')) logEl.innerHTML = '';
-  const d = document.createElement('div');
-  d.className = speaker;
-  d.textContent = (speaker === 'agent' ? 'agent   ' : 'worker  ') + text;
-  logEl.appendChild(d);
-  logEl.scrollTop = logEl.scrollHeight;
-}
+/** Only an actual boolean counts. Absent means not established, never false. */
+const tri = (v) => (typeof v === 'boolean' ? v : null);
+const keep = (next, current) => (next === null ? current : next);
+
+function setStatus(t) { statusEl.textContent = t; }
 
 /* Everything the model produces is a repetition of whatever somebody said into
    a microphone on a public page, so none of it goes near innerHTML. Built as
@@ -159,6 +284,12 @@ function el(tag, className, text) {
   if (className) n.className = className;
   if (text != null) n.textContent = text;
   return n;
+}
+
+function addTurn(speaker, text) {
+  if (logEl.querySelector('.idle')) logEl.replaceChildren();
+  logEl.appendChild(el('div', speaker, (speaker === 'agent' ? 'agent   ' : 'worker  ') + text));
+  logEl.scrollTop = logEl.scrollHeight;
 }
 
 function renderFacts() {
@@ -178,8 +309,9 @@ renderFacts();
 
 function reset() {
   for (const k of Object.keys(FACTS)) { FACTS[k].state = null; FACTS[k].evidence = null; }
-  logEl.innerHTML = '<div class="fine" style="border:0">Nothing yet.</div>';
-  verdictEl.innerHTML = '';
+  hasWater = null; hasShade = null;
+  logEl.replaceChildren(el('div', 'idle', 'Nothing yet.'));
+  verdictEl.replaceChildren();
   renderFacts();
 }
 
@@ -195,13 +327,18 @@ function applyTool(name, args) {
       verdictEl.replaceChildren(note);
     }
   } else if (name === 'record_water_and_shade') {
-    FACTS.water.state = !!args.has_water && !!args.has_shade; FACTS.water.evidence = args.evidence;
+    hasWater = keep(tri(args.has_water), hasWater);
+    hasShade = keep(tri(args.has_shade), hasShade);
+    // Both, or it does not count. Water alone let a worker with a bottle and
+    // nowhere out of the sun come back fully confirmed.
+    FACTS.water.state = hasWater === null && hasShade === null
+      ? null
+      : hasWater === true && hasShade === true;
+    FACTS.water.evidence = args.evidence ?? FACTS.water.evidence;
   } else if (name === 'report_distress') {
-    const note = el('div', 'note');
-    note.style.background = 'var(--alert)';
-    note.style.color = '#fff';
+    const note = el('div', 'note urgent');
     note.append(el('strong', null, 'Distress escalated.'), document.createTextNode(
-      ' ' + (args.symptoms ?? '') + ' — call handed to a human.'));
+      ' ' + (args.symptoms ?? '') + '. Call handed to a human.'));
     verdictEl.replaceChildren(note);
   }
   renderFacts();
@@ -264,7 +401,7 @@ function say(text, kind) {
 }
 
 $('walk').onclick = async () => {
-  reset(); setStatus('scripted call - playing');
+  reset(); setStatus('scripted call playing');
   $('walk').disabled = true;
   try { speechSynthesis.cancel(); } catch {}
   await loadVoices();
@@ -350,7 +487,7 @@ $('start').onclick = async () => {
       const r = await fetch('/api/agent-config');
       cfg = await r.json();
     } catch (err) {
-      setStatus('could not load agent config: ' + err.message);
+      setStatus('config failed: ' + err.message);
       try { socket.close(); } catch {}
       teardownAudio();
       $('start').disabled = false; $('stop').disabled = true;
@@ -419,14 +556,14 @@ $('start').onclick = async () => {
     if (e.type === 'transcript.user') addTurn('worker', e.text);
     else if (e.type === 'transcript.agent') addTurn('agent', e.text);
     else if (e.type === 'reply.audio') { queue.push(e.data); playNext(); }
-    else if (e.type === 'session.ready') setStatus('connected - speak when it stops');
-    else if (e.type === 'session.error') { setStatus('error: ' + JSON.stringify(e)); console.error('session.error', e); }
+    else if (e.type === 'session.ready') setStatus('connected, speak when it stops');
+    else if (e.type === 'session.error') { setStatus('error: ' + (e.error ?? 'unknown')); console.error('session.error', e); }
     else if (e.type === 'tool.call') {
       const raw = e.arguments ?? {};
       const args = typeof raw === 'string' ? JSON.parse(raw) : raw;
       applyTool(e.name, args);
       // call_id, not tool_call_id. Getting this wrong does not fail the tool,
-      // it tears down the whole session with invalid_format — which is why the
+      // it tears down the whole session with invalid_format, which is why the
       // agent asked one question and then went silent.
       socket.send(JSON.stringify({
         type: 'tool.result',
@@ -454,8 +591,6 @@ $('stop').onclick = () => {
   teardownAudio();
   setStatus('call ended');
 };
-
-
 </script>
 </body>
 </html>

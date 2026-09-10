@@ -57,6 +57,32 @@ const start = (lang = 'hi') => newOutcome({ workerId: 'w1', alertId: 'a1', langu
   is('and the call is not fully confirmed', s.status, 'partially_confirmed');
 }
 
+// ── 1c. a field the worker never answered ──────────────────────────────────
+// Taken verbatim from a live call. The worker said "I am coming down off the
+// scaffold, I will sit by the gate", which answers shade and says nothing about
+// water. The model still sent has_water: false, because the schema demanded a
+// boolean, and the record then read as this man reporting he had no water.
+{
+  const o = start();
+  addTurn(o, 'worker', 'I am coming down off the scaffold, I will sit by the gate.');
+  applyToolCall(o, 'record_water_and_shade', {
+    has_shade: true, evidence: 'I will sit by the gate.',
+  });
+
+  is('an unanswered field is not recorded as false', o.waterAndShade.hasWater, null);
+  is('and the answered one is kept', o.waterAndShade.hasShade, true);
+
+  // Later in the same call, water finally comes up. That must not wipe shade.
+  applyToolCall(o, 'record_water_and_shade', {
+    has_water: true, evidence: 'I have a bottle in my bag.',
+  });
+  is('a later call fills the gap', o.waterAndShade.hasWater, true);
+  is('without erasing what was already established', o.waterAndShade.hasShade, true);
+
+  endCall(o, 'all_facts_established');
+  is('and both together count as the third fact', summarise(o).factsEstablished, 1);
+}
+
 // ── 2. the reflexive yes ───────────────────────────────────────────────────
 // The one this whole design exists for. Someone said yes to an authoritative
 // voice on a phone. That is not comprehension, and recording it as such would

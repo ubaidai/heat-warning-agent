@@ -19,6 +19,24 @@
 /** A fact nobody established yet. Not false. Not true. */
 const UNSET = { established: null, evidence: null };
 
+/**
+ * Read a boolean that is allowed to be absent.
+ *
+ * `Boolean(args.has_water)` turned a missing field into false, and a missing
+ * field is exactly what arrives when the worker has not been asked yet. A live
+ * call recorded has_water: false off "I will sit by the gate", where water was
+ * never mentioned, and the audit trail then said this man had no water. Only an
+ * actual boolean counts; anything else is still not established.
+ */
+const tri = (v) => (typeof v === 'boolean' ? v : null);
+
+/**
+ * A second tool call that omits a field must not erase what the first one
+ * established. Facts accumulate across a call; they do not get replaced
+ * wholesale each time the agent reports.
+ */
+const keep = (next, current) => (next === null ? current : next);
+
 export function newOutcome({ workerId, alertId, language, startedAt = new Date() }) {
   return {
     workerId,
@@ -57,24 +75,26 @@ export function applyToolCall(outcome, name, args) {
   switch (name) {
     case 'record_understanding':
       outcome.understood = {
-        established: Boolean(args.established),
-        evidence: args.evidence ?? null,
+        established: keep(tri(args.established), outcome.understood.established),
+        evidence: args.evidence ?? outcome.understood.evidence,
       };
       return { result: { recorded: true }, urgent: false };
 
     case 'record_work_stopped':
       outcome.stoppedWork = {
-        established: Boolean(args.established),
-        evidence: args.evidence ?? null,
-        blocker: args.blocker || null,
+        established: keep(tri(args.established), outcome.stoppedWork.established),
+        evidence: args.evidence ?? outcome.stoppedWork.evidence,
+        blocker: args.blocker || outcome.stoppedWork.blocker,
       };
       return { result: { recorded: true }, urgent: false };
 
     case 'record_water_and_shade':
+      // Water and shade are two separate questions and they are often answered
+      // at two different points in the call, so each is carried independently.
       outcome.waterAndShade = {
-        hasWater: Boolean(args.has_water),
-        hasShade: Boolean(args.has_shade),
-        evidence: args.evidence ?? null,
+        hasWater: keep(tri(args.has_water), outcome.waterAndShade.hasWater),
+        hasShade: keep(tri(args.has_shade), outcome.waterAndShade.hasShade),
+        evidence: args.evidence ?? outcome.waterAndShade.evidence,
       };
       return { result: { recorded: true }, urgent: false };
 

@@ -70,15 +70,25 @@ export const TOOLS = [
   {
     type: 'function',
     name: 'record_water_and_shade',
-    description: 'Record whether the worker has drinking water and somewhere shaded to rest.',
+    description:
+      'Record whether the worker has drinking water and somewhere out of the sun. ' +
+      'Include a field ONLY if the worker actually told you. If water has not come ' +
+      'up yet, leave has_water out rather than guessing false. Call this again ' +
+      'later with the other field once you know it.',
     parameters: {
       type: 'object',
       properties: {
-        has_water: { type: 'boolean' },
-        has_shade: { type: 'boolean' },
-        evidence: { type: 'string' },
+        has_water: {
+          type: 'boolean',
+          description: 'Omit entirely unless the worker said whether they have drinking water.',
+        },
+        has_shade: {
+          type: 'boolean',
+          description: 'Omit entirely unless the worker said whether they can get out of the sun.',
+        },
+        evidence: { type: 'string', description: 'The worker\'s own words.' },
       },
-      required: ['has_water', 'has_shade', 'evidence'],
+      required: ['evidence'],
     },
   },
   {
@@ -197,9 +207,10 @@ export function systemPrompt({ workerName, employerName, wbgtC, limitC, language
     'No shade: name the alternatives. A vehicle, a doorway, under a truck, behind',
     'a wall, inside any building. Out of the sun beats comfortable.',
     '',
-    'They cannot stop working: do not argue and do not repeat the warning. Tell',
-    'them the risk in one sentence, then ask them to at least drink water and put',
-    'something wet on their neck. Record why they cannot stop.',
+    'They cannot stop working: call record_work_stopped with established=false and',
+    'the reason in blocker before you say anything else. Then do not argue and do',
+    'not repeat the warning. Tell them the risk in one sentence, then ask them to',
+    'at least drink water and put something wet on their neck.',
     '',
     'They do not understand: say it shorter and simpler. Two sentences at most.',
     '',
@@ -226,6 +237,11 @@ export function systemPrompt({ workerName, employerName, wbgtC, limitC, language
     'Call the record tools as you establish each fact, not at the end. Do not end',
     'the call until all three are recorded, the worker tells you they cannot',
     'continue, or you escalated for distress.',
+    '',
+    'Record only what they said. Never fill in a field to complete the form. If',
+    'you have not asked about water yet, leave has_water out of the tool call',
+    'instead of sending false. A false you invented reads, months later, as this',
+    'worker telling an inspector he had no water.',
   ].join('\n');
 }
 
