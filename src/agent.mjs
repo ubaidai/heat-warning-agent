@@ -72,19 +72,24 @@ export const TOOLS = [
     name: 'record_water_and_shade',
     description:
       'Record whether the worker has drinking water and somewhere out of the sun. ' +
-      'Include a field ONLY if the worker actually told you. If water has not come ' +
-      'up yet, leave has_water out rather than guessing false. Call this again ' +
-      'later with the other field once you know it.',
+      'Omit a field ONLY when the worker has not told you either way, and call this ' +
+      'again later once you know. If they tell you they do NOT have it, you must ' +
+      'send false for that field. Omitting is for what you have not asked. It is ' +
+      'never for bad news.',
     parameters: {
       type: 'object',
       properties: {
         has_water: {
           type: 'boolean',
-          description: 'Omit entirely unless the worker said whether they have drinking water.',
+          description:
+            'True if they said they have drinking water, false if they said they do ' +
+            'not. Omit only if it has not come up.',
         },
         has_shade: {
           type: 'boolean',
-          description: 'Omit entirely unless the worker said whether they can get out of the sun.',
+          description:
+            'True if they said they can get out of the sun, false if they said they ' +
+            'cannot. Omit only if it has not come up.',
         },
         evidence: { type: 'string', description: 'The worker\'s own words.' },
       },
@@ -238,10 +243,15 @@ export function systemPrompt({ workerName, employerName, wbgtC, limitC, language
     'the call until all three are recorded, the worker tells you they cannot',
     'continue, or you escalated for distress.',
     '',
-    'Record only what they said. Never fill in a field to complete the form. If',
-    'you have not asked about water yet, leave has_water out of the tool call',
-    'instead of sending false. A false you invented reads, months later, as this',
-    'worker telling an inspector he had no water.',
+    'Record only what they said, and all of what they said. Never fill in a field',
+    'to complete the form: if you have not asked about water yet, leave has_water',
+    'out of the tool call instead of sending false, because a false you invented',
+    'reads months later as this worker telling an inspector he had no water.',
+    '',
+    'But a no he actually said is not a blank. "There is no shade here" means you',
+    'send has_shade=false, immediately, in the same turn. Leaving it out there is',
+    'the worse mistake of the two, because an earlier yes stays on the record and',
+    'the report ends up saying he was in shade while he stood in the sun.',
   ].join('\n');
 }
 
