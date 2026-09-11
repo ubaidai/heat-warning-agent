@@ -12,6 +12,12 @@ Two buttons. *Start the call* takes a live session through the Voice Agent API u
 
 Try agreeing without understanding. Say "yes" to the first question and watch what gets filed.
 
+## Demo
+
+[Two minutes, showing one whole call](assets/heat-warning-agent-demo.mp4). Also served at [heat-warning-agent.vercel.app/assets/heat-warning-agent-demo.mp4](https://heat-warning-agent.vercel.app/assets/heat-warning-agent-demo.mp4).
+
+The agent's voice in it is real: the audio was recorded off a live Voice Agent session, and every frame is the page above rendered with that call's own tool calls replayed through it. The worker's replies are text to speech, and the video says so before the call starts. Nobody was phoned to make it.
+
 ## The problem
 
 Karachi's 2015 heatwave killed over a thousand people in a week, most of them working outdoors. Forecasts existed. They never reached the rickshaw drivers, construction labourers and delivery riders who were dying, because a citywide number on a website is not a warning that arrives.
