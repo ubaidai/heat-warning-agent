@@ -4,6 +4,14 @@ A voice agent that phones outdoor workers when heat crosses a dangerous limit, a
 
 Built on [AssemblyAI's Voice Agent API](https://www.assemblyai.com/docs/voice-agents/voice-agent-api).
 
+## Try it
+
+**[heat-warning-agent.vercel.app](https://heat-warning-agent.vercel.app)**
+
+Two buttons. *Start the call* takes a live session through the Voice Agent API using your microphone, and you can watch the record being written beside the transcript as you speak. *Play a scripted call* plays the same conversation aloud with no key and no credits, in case the live one is unavailable.
+
+Try agreeing without understanding. Say "yes" to the first question and watch what gets filed.
+
 ## The problem
 
 Karachi's 2015 heatwave killed over a thousand people in a week, most of them working outdoors. Forecasts existed. They never reached the rickshaw drivers, construction labourers and delivery riders who were dying, because a citywide number on a website is not a warning that arrives.
@@ -67,7 +75,7 @@ Spoken Urdu and spoken Hindi are the same language. They diverge in script and i
 node scripts/outcome-check.mjs
 ```
 
-Runs the five ways a call actually ends — confirmed, reflexive yes, cannot stop, distress, unanswered — through the record logic. No API key, no microphone, no phone line. 16 checks.
+Runs the ways a call actually ends, confirmed, reflexive yes, cannot stop, distress, unanswered, and the half-answered water question, through the record logic. No API key, no microphone, no phone line. 23 checks.
 
 A live call needs an AssemblyAI API key and a telephony leg to carry the audio. `src/session.mjs` handles the WebSocket, the tool-call loop, and clean teardown; `sendAudio()` takes base64 PCM16 from whatever is holding the phone line.
 
@@ -76,6 +84,9 @@ One detail worth keeping: closing the socket without sending `session.end` leave
 ## Structure
 
 ```
+index.html         the live demo, and the browser side of a call
+api/token.js       mints a short-lived session token, origin-locked
+api/agent-config.js serves the prompt and tools, so there is one copy of them
 src/agent.mjs      system prompt, tool schemas, per-language greetings
 src/session.mjs    the WebSocket session and tool-call loop
 src/outcome.mjs    turning a call into a record
@@ -84,7 +95,9 @@ scripts/           the checks
 
 ## Status
 
-The agent definition, the record logic and the session handling are written and tested. Live calling needs a key and a phone line.
+The agent, the record logic and the session handling are written, tested, and running: the link above places real calls through the Voice Agent API from a browser.
+
+What is not built is the telephony leg. Reaching a worker on an actual phone number needs a carrier, and that is the difference between this and a deployed product. `sendAudio()` takes base64 PCM16 from whatever is holding the line, so the seam is there.
 
 Part of a heat-safety compliance system for outdoor workforces. This repo is the voice layer, MIT licensed and standalone.
 
