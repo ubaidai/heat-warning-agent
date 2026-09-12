@@ -18,6 +18,8 @@ Try agreeing without understanding. Say "yes" to the first question and watch wh
 
 The agent's voice in it is real: the audio was recorded off a live Voice Agent session, and every frame is the page above rendered with that call's own tool calls replayed through it. The worker's replies are text to speech, and the video says so before the call starts. Nobody was phoned to make it.
 
+Slides: [ten of them](assets/heat-warning-agent-deck.pdf), also at [heat-warning-agent.vercel.app/assets/heat-warning-agent-deck.pdf](https://heat-warning-agent.vercel.app/assets/heat-warning-agent-deck.pdf).
+
 ## The problem
 
 Karachi's 2015 heatwave killed over a thousand people in a week, most of them working outdoors. Forecasts existed. They never reached the rickshaw drivers, construction labourers and delivery riders who were dying, because a citywide number on a website is not a warning that arrives.
